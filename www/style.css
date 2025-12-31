@@ -1,0 +1,33 @@
+:root {
+    --ion-color-primary: #5c6bc0;
+    --ion-color-primary-rgb: 92,107,192;
+    --ion-color-secondary: #26a69a;
+}
+
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+
+/* Page Management */
+.page-section { display: none; padding-bottom: 60px; }
+.page-section.active { display: block; animation: fadeIn 0.3s; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* Book List Styling */
+.list-view ion-card { margin: 10px; }
+.grid-view { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px; }
+.grid-view ion-card { margin: 0; }
+
+/* Stats Styling */
+.stats-container { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; padding: 15px; }
+.stat-card {
+    background: white; border-radius: 15px; padding: 20px; text-align: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #f0f0f0;
+}
+.stat-card h1 { margin: 0; font-size: 36px; font-weight: 800; }
+.stat-card p { margin: 5px 0 0; color: #666; font-size: 14px; text-transform: uppercase; }
+
+/* Ad Banner */
+.ad-banner {
+    width: 100%; height: 50px; background: #eee;
+    display: flex; align-items: center; justify-content: center;
+    color: #999; margin-top: 20px; border: 1px dashed #ccc;
+}

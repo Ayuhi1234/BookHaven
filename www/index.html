@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BookHaven Library</title>
+    
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@ionic/core/dist/ionic/ionic.esm.js"></script>
+    <script nomodule src="https://cdn.jsdelivr.net/npm/@ionic/core/dist/ionic/ionic.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@ionic/core/css/ionic.bundle.css"/>
+    
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <ion-app>
+        <ion-content id="main-content">
+            
+            <div id="tab-library" class="page-section active">
+                <ion-header>
+                    <ion-toolbar color="primary">
+                        <ion-title>My Library</ion-title>
+                        <ion-buttons slot="end">
+                            <ion-button onclick="toggleView()">
+                                <ion-icon name="grid-outline" id="view-icon"></ion-icon>
+                            </ion-button>
+                        </ion-buttons>
+                    </ion-toolbar>
+                    <ion-toolbar>
+                        <ion-searchbar id="search-bar" placeholder="Search title or author..."></ion-searchbar>
+                    </ion-toolbar>
+                    <ion-toolbar>
+                        <ion-segment value="all" id="filter-segment">
+                            <ion-segment-button value="all"><ion-label>All</ion-label></ion-segment-button>
+                            <ion-segment-button value="Reading"><ion-label>Reading</ion-label></ion-segment-button>
+                            <ion-segment-button value="Completed"><ion-label>Done</ion-label></ion-segment-button>
+                        </ion-segment>
+                    </ion-toolbar>
+                </ion-header>
+                
+                <div id="book-list-container" class="list-view">
+                    </div>
+                
+                <ion-fab vertical="bottom" horizontal="end" slot="fixed">
+                    <ion-fab-button onclick="openModal('add-modal')">
+                        <ion-icon name="add"></ion-icon>
+                    </ion-fab-button>
+                </ion-fab>
+            </div>
+
+            <div id="tab-stats" class="page-section">
+                <ion-header>
+                    <ion-toolbar color="primary"><ion-title>Reading Stats</ion-title></ion-toolbar>
+                </ion-header>
+                <div class="stats-container">
+                    <div class="stat-card">
+                        <h1 id="stat-total">0</h1>
+                        <p>Books Collected</p>
+                    </div>
+                    <div class="stat-card">
+                        <h1 id="stat-read" style="color:#4cd964">0</h1>
+                        <p>Books Read</p>
+                    </div>
+                    <div class="stat-card">
+                        <h1 id="stat-streak" style="color:#ff9800">0</h1>
+                        <p>Day Streak 🔥</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-settings" class="page-section">
+                <ion-header>
+                    <ion-toolbar color="primary"><ion-title>Settings</ion-title></ion-toolbar>
+                </ion-header>
+                <ion-list>
+                    <ion-item>
+                        <ion-label>Daily Reading Reminder</ion-label>
+                        <ion-toggle id="reminder-toggle" onionChange="toggleReminder(event)"></ion-toggle>
+                    </ion-item>
+                    <ion-item button onclick="exportData()">
+                        <ion-icon slot="start" name="download-outline"></ion-icon>
+                        <ion-label>Export Data (Premium)</ion-label>
+                    </ion-item>
+                    <ion-item lines="none">
+                        <div style="width:100%; text-align:center; margin-top:20px; color:#aaa;">
+                            <small>BookHaven v1.0.0</small>
+                        </div>
+                    </ion-item>
+                </ion-list>
+                
+                <div class="ad-banner">
+                    <p>AdMob Banner Space</p>
+                </div>
+            </div>
+
+        </ion-content>
+
+        <ion-footer>
+            <ion-toolbar>
+                <ion-segment onionChange="switchTab(event.detail.value)" value="library">
+                    <ion-segment-button value="library">
+                        <ion-icon name="library-outline"></ion-icon>
+                        <ion-label>Library</ion-label>
+                    </ion-segment-button>
+                    <ion-segment-button value="stats">
+                        <ion-icon name="stats-chart-outline"></ion-icon>
+                        <ion-label>Stats</ion-label>
+                    </ion-segment-button>
+                    <ion-segment-button value="settings">
+                        <ion-icon name="settings-outline"></ion-icon>
+                        <ion-label>Settings</ion-label>
+                    </ion-segment-button>
+                </ion-segment>
+            </ion-toolbar>
+        </ion-footer>
+
+        <ion-modal id="add-modal">
+            <ion-header>
+                <ion-toolbar>
+                    <ion-title>Add Book</ion-title>
+                    <ion-buttons slot="end"><ion-button onclick="closeModal('add-modal')">Close</ion-button></ion-buttons>
+                </ion-toolbar>
+            </ion-header>
+            <ion-content class="ion-padding">
+                <ion-item>
+                    <ion-label position="stacked">Title</ion-label>
+                    <ion-input id="inp-title" placeholder="e.g. The Alchemist"></ion-input>
+                </ion-item>
+                <ion-item>
+                    <ion-label position="stacked">Author</ion-label>
+                    <ion-input id="inp-author" placeholder="e.g. Paulo Coelho"></ion-input>
+                </ion-item>
+                <ion-item>
+                    <ion-label position="stacked">Status</ion-label>
+                    <ion-select id="inp-status" value="Want to Read">
+                        <ion-select-option value="Want to Read">Want to Read</ion-select-option>
+                        <ion-select-option value="Reading">Reading</ion-select-option>
+                        <ion-select-option value="Completed">Completed</ion-select-option>
+                    </ion-select>
+                </ion-item>
+                <ion-item>
+                    <ion-label position="stacked">Rating (1-5)</ion-label>
+                    <ion-range id="inp-rating" min="0" max="5" snaps="true" ticks="true" pin="true"></ion-range>
+                </ion-item>
+                <ion-button expand="block" class="ion-margin-top" onclick="saveBook()">Save Book</ion-button>
+            </ion-content>
+        </ion-modal>
+
+    </ion-app>
+    <script src="script.js"></script>
+</body>
+</html>
