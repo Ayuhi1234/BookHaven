@@ -1,0 +1,42 @@
+name: Build BookHaven
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 1. Setup Java
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      # 2. Setup Node
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # 3. Install
+      - run: npm install
+
+      # 4. Sync
+      - run: npx cap sync
+
+      # 5. FIX PERMISSIONS & BUILD (The Magic Fix)
+      - name: Build APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      # 6. Upload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BookHaven-App
+          path: android/app/build/outputs/apk/debug/app-debug.apk
