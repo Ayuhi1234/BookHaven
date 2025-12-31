@@ -11,18 +11,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 1. Setup Java
+      # 1. Setup Java (UPDATED TO VERSION 21)
       - uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '17'
+          java-version: '21'
 
       # 2. Setup Node
       - uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      # 3. Force Clean Install (Fixes permission issues)
+      # 3. Force Clean Install
       - name: Install Dependencies
         run: |
           rm -rf node_modules
