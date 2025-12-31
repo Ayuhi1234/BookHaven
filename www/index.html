@@ -15,13 +15,19 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
 
     <style>
-        /* Fix to make sure Footer stays at bottom */
-        #app-screen { display: flex; flex-direction: column; height: 100vh; }
-        ion-content { flex: 1; --background: var(--ion-background-color); }
+        /* CRITICAL FIX: Force the App to fill the screen */
+        html, body { height: 100%; margin: 0; padding: 0; }
+        #app-screen { display: flex; flex-direction: column; height: 100vh; width: 100%; }
+        ion-content { flex: 1; position: relative; --background: var(--ion-background-color); }
+        ion-footer { flex-shrink: 0; } 
+        
+        /* Widget Styles */
         .buzz-card { background: linear-gradient(45deg, #ff6b6b, #ff8e53); color: white; margin-top: 20px; cursor: pointer; }
-        .poll-card { background: #fff; border: 1px solid #ddd; border-radius: 10px; padding: 15px; margin-bottom: 15px; }
-        .poll-option { background: #f4f4f4; padding: 10px; margin: 5px 0; border-radius: 5px; cursor: pointer; display: flex; justify-content: space-between; }
-        .poll-option:hover { background: #e0e0e0; }
+        .leaderboard-card { background: linear-gradient(135deg, #FFD700, #FDB931); color: #444; margin-bottom: 15px; }
+        .chat-container { height: 60vh; overflow-y: auto; background: #f9f9f9; border:1px solid #eee; border-radius: 8px; padding: 10px; margin-bottom: 10px; }
+        .message-bubble { padding: 8px 12px; border-radius: 15px; margin-bottom: 8px; max-width: 80%; font-size: 14px; }
+        .message-bubble.me { background: #3880ff; color: white; align-self: flex-end; margin-left: auto; border-bottom-right-radius: 2px; }
+        .message-bubble.them { background: #e0e0e0; color: #333; align-self: flex-start; border-bottom-left-radius: 2px; }
     </style>
 </head>
 <body>
@@ -30,7 +36,7 @@
         <div id="auth-screen" style="height:100vh; display:flex; flex-direction:column; justify-content:center; padding:20px; background:var(--ion-color-light);">
             <div style="text-align:center; margin-bottom:40px;">
                 <h1 style="color:var(--ion-color-primary); font-size:42px; font-weight:bold; margin:0;">BookHaven 📚</h1>
-                <p>Join the Reading World</p>
+                <p>Social Library</p>
             </div>
             <ion-card>
                 <ion-card-content>
@@ -78,7 +84,7 @@
                     <ion-card class="buzz-card" onclick="switchToClub()">
                         <ion-card-content>
                             <h3 style="margin:0; font-weight:bold; font-size:16px;">🔥 Community Buzz</h3>
-                            <div id="buzz-preview" style="font-size:13px; margin-top:5px; opacity:0.9;">Loading latest gossip...</div>
+                            <div id="buzz-preview" style="font-size:13px; margin-top:5px; opacity:0.9;">Loading...</div>
                         </ion-card-content>
                     </ion-card>
 
@@ -87,7 +93,6 @@
                         <ion-chip color="success" onclick="filterBooks('read')"><ion-label>Read</ion-label></ion-chip>
                         <ion-button size="small" color="warning" onclick="surpriseMe()" style="margin-left:auto;"><ion-icon name="dice-outline"></ion-icon></ion-button>
                     </div>
-
                     <ion-button expand="block" onclick="openModal()">+ Add Book</ion-button>
                     <ion-list id="book-list" style="margin-top:20px;"></ion-list>
                 </div>
@@ -96,7 +101,7 @@
                     
                     <ion-segment value="feed" id="club-segment" onionChange="switchClubView(event.detail.value)">
                         <ion-segment-button value="feed"><ion-label>Feed</ion-label></ion-segment-button>
-                        <ion-segment-button value="poll"><ion-label>Vote</ion-label></ion-segment-button>
+                        <ion-segment-button value="chat"><ion-label>Chat</ion-label></ion-segment-button>
                         <ion-segment-button value="members"><ion-label>Members</ion-label></ion-segment-button>
                     </ion-segment>
 
@@ -108,16 +113,22 @@
                         </ion-fab>
                     </div>
 
-                    <div id="view-poll" style="display:none; margin-top:15px;">
-                        <h2 style="text-align:center; color:#555;">📊 Weekly Poll</h2>
-                        <div class="poll-card">
-                            <h3 id="poll-question" style="margin-top:0;">Which genre is best?</h3>
-                            <div id="poll-options"></div>
+                    <div id="view-chat" style="display:none; margin-top:15px;">
+                        <div class="chat-container" id="chat-messages">
+                            <p style="text-align:center; opacity:0.5; margin-top:20px;">Start chatting! 👋</p>
+                        </div>
+                        <div style="display:flex; gap:10px;">
+                            <ion-input id="chat-input" placeholder="Message..." style="border:1px solid #ccc; border-radius:20px; --padding-start:15px;"></ion-input>
+                            <ion-button onclick="sendChatMessage()" style="border-radius:50%; width:50px;"><ion-icon name="send"></ion-icon></ion-button>
                         </div>
                     </div>
 
                     <div id="view-members" style="display:none; margin-top:15px;">
-                        <h3 style="font-size:12px; color:#666;">COMMUNITY MEMBERS</h3>
+                        <ion-card class="leaderboard-card">
+                            <ion-card-content style="text-align:center;">
+                                <h2 style="margin:0;">🏆 Top Readers</h2>
+                            </ion-card-content>
+                        </ion-card>
                         <ion-list id="members-list"></ion-list>
                     </div>
                 </div>
@@ -147,7 +158,7 @@
                 <div style="text-align:center; margin-top:15px;"><div id="private-stars" style="font-size:30px; color:#ffc107;"></div></div>
                 <input type="hidden" id="inp-image"><input type="hidden" id="inp-rating" value="0">
                 <div id="img-preview" style="text-align:center; margin-top:10px;"></div>
-                <ion-button expand="block" class="ion-margin-top" onclick="saveBook()">Save Book</ion-button>
+                <ion-button expand="block" class="ion-margin-top" onclick="saveBook()">Save</ion-button>
             </ion-content>
         </ion-modal>
 
@@ -161,7 +172,6 @@
                 <div id="post-preview" style="text-align:center;"></div>
                 <input type="hidden" id="post-book-title"><input type="hidden" id="post-book-image"><input type="hidden" id="post-rating" value="0">
                 <ion-item><ion-label position="stacked">Review</ion-label><ion-textarea id="post-content" rows="4"></ion-textarea></ion-item>
-                <div style="text-align:center; margin-top:15px;"><div id="public-stars" style="font-size:30px; color:#ffc107;"></div></div>
                 <ion-button expand="block" class="ion-margin-top" onclick="sharePost()">Post Review</ion-button>
             </ion-content>
         </ion-modal>

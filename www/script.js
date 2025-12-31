@@ -1,4 +1,4 @@
-// --- 1. FIREBASE CONFIG (USE YOUR KEYS) ---
+// --- 1. FIREBASE CONFIG ---
 const firebaseConfig = {
     apiKey: "AIzaSyBpvzufWwZy73C1RP924Ja7_Yefkmhc4Lo",
     authDomain: "bookhaven-club.firebaseapp.com",
@@ -25,11 +25,11 @@ auth.onAuthStateChanged((user) => {
     if (user) {
         currentUser = user;
         document.getElementById('auth-screen').style.display = 'none';
-        document.getElementById('app-screen').style.display = 'flex'; // FIXED: use flex for layout
+        document.getElementById('app-screen').style.display = 'flex'; // Use Flex for sticky footer
         loadMyBooks();
         loadCommunity();
         loadMembers();
-        initPoll(); // Start the poll
+        loadChat();
     } else {
         currentUser = null;
         document.getElementById('auth-screen').style.display = 'flex';
@@ -64,35 +64,43 @@ function handleAuth() {
 }
 function logout() { auth.signOut(); }
 
-// --- 4. NAVIGATION & UI ---
+// --- 4. NAVIGATION (ROBUST) ---
 window.onload = function() {
     const savedTheme = localStorage.getItem('bookhaven_theme');
     if(savedTheme === 'dark') { document.body.classList.add('dark'); document.getElementById('theme-icon').name = 'sunny'; }
 
-    // Connect Tabs
     const mainTabs = document.getElementById('main-tabs');
     if(mainTabs) mainTabs.addEventListener('ionChange', (e) => switchTab(e.detail.value));
     
-    // Connect Community Views
     const clubSeg = document.getElementById('club-segment');
     if(clubSeg) clubSeg.addEventListener('ionChange', (e) => switchClubView(e.detail.value));
 };
 
 function switchTab(tab) {
+    // Safety check to prevent crashes
+    if(!document.getElementById('tab-library') || !document.getElementById('tab-club')) return;
+
     document.getElementById('tab-library').style.display = 'none';
     document.getElementById('tab-club').style.display = 'none';
-    document.getElementById('tab-' + tab).style.display = 'block';
+    
+    const selected = document.getElementById('tab-' + tab);
+    if(selected) {
+        selected.style.display = 'block';
+    } else {
+        console.error("Tab not found: " + tab);
+        // Fallback to library if error
+        document.getElementById('tab-library').style.display = 'block';
+    }
 }
 
 function switchToClub() {
-    // Helper to jump to club from "Buzz" widget
     document.getElementById('main-tabs').value = 'club';
     switchTab('club');
 }
 
 function switchClubView(view) {
     document.getElementById('view-feed').style.display = view === 'feed' ? 'block' : 'none';
-    document.getElementById('view-poll').style.display = view === 'poll' ? 'block' : 'none';
+    document.getElementById('view-chat').style.display = view === 'chat' ? 'block' : 'none';
     document.getElementById('view-members').style.display = view === 'members' ? 'block' : 'none';
 }
 
@@ -103,7 +111,7 @@ function toggleTheme() {
     document.getElementById('theme-icon').name = isDark ? 'sunny' : 'moon';
 }
 
-// --- 5. PRIVATE LIBRARY ---
+// --- 5. LIBRARY ---
 function saveBook() {
     if(!currentUser) return;
     const title = document.getElementById('inp-title').value;
@@ -114,7 +122,7 @@ function saveBook() {
 
     if(title) {
         db.ref('users/' + currentUser.uid + '/books').push({ title, author, image, link, rating, done: false });
-        db.ref('members/' + currentUser.uid + '/booksRead').transaction((c) => (c || 0) + 1);
+        db.ref('members/' + currentUser.uid + '/booksRead').transaction(c => (c || 0) + 1);
         closeModal(); document.getElementById('inp-title').value = "";
     } else { alert("Title required!"); }
 }
@@ -168,7 +176,7 @@ function surpriseMe() {
     else alert("No unread books!");
 }
 
-// --- 6. COMMUNITY (Interactive) ---
+// --- 6. COMMUNITY ---
 function sharePost() {
     if(!currentUser) return;
     const content = document.getElementById('post-content').value;
@@ -186,16 +194,21 @@ function sharePost() {
 }
 
 function loadCommunity() {
-    db.ref("reviews").limitToLast(30).on("value", (snap) => {
+    db.ref("reviews").limitToLast(50).on("value", (snap) => {
         allPosts = [];
-        snap.forEach(c => allPosts.push({ key: c.key, ...c.val() }));
-        renderFeed(allPosts);
-        
-        // Update "Buzz" Widget on Home Screen
+        const titleCounts = {};
+        snap.forEach(c => {
+            const p = { key: c.key, ...c.val() };
+            allPosts.push(p);
+            titleCounts[p.title] = (titleCounts[p.title] || 0) + 1;
+        });
+
+        // Buzz Widget
         if(allPosts.length > 0) {
             const last = allPosts[allPosts.length - 1];
-            document.getElementById('buzz-preview').innerHTML = `<b>${last.user}</b> just reviewed <i>${last.title}</i>: "${last.content.substring(0,30)}..."`;
+            document.getElementById('buzz-preview').innerHTML = `<b>${last.user}</b>: ${last.content.substring(0,30)}...`;
         }
+        renderFeed(allPosts);
     });
 }
 
@@ -233,6 +246,7 @@ function renderFeed(posts) {
         feed.appendChild(card);
     });
 }
+
 function likePost(k, l) { db.ref("reviews/"+k).update({likes: l+1}); }
 function addComment(key) {
     const input = document.getElementById(`comment-${key}`);
@@ -245,52 +259,47 @@ function addComment(key) {
     });
 }
 
-// --- 7. NEW: POLL SYSTEM ---
-function initPoll() {
-    // Define Poll Data
-    const options = ["Sci-Fi", "Romance", "Mystery", "Non-Fiction"];
-    const container = document.getElementById('poll-options');
-    container.innerHTML = "";
-    
-    options.forEach(opt => {
-        // Create option button
+// --- 7. CHATROOM ---
+function loadChat() {
+    const chatContainer = document.getElementById('chat-messages');
+    db.ref('messages').limitToLast(50).on('child_added', (snap) => {
+        const msg = snap.val();
+        const isMe = msg.email === currentUser.email;
         const div = document.createElement('div');
-        div.className = "poll-option";
-        div.innerHTML = `<span>${opt}</span><span id="poll-count-${opt}">0</span>`;
-        div.onclick = () => votePoll(opt);
-        container.appendChild(div);
-        
-        // Listen for live counts
-        db.ref('polls/genre/' + opt).on('value', (snap) => {
-            document.getElementById(`poll-count-${opt}`).innerText = snap.val() || 0;
-        });
+        div.className = `message-bubble ${isMe ? 'me' : 'them'}`;
+        div.innerHTML = `<b>${msg.user}</b>: ${msg.text}`;
+        chatContainer.appendChild(div);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
     });
 }
-
-function votePoll(option) {
-    db.ref('polls/genre/' + option).transaction(count => (count || 0) + 1);
-    alert(`Voted for ${option}!`);
+function sendChatMessage() {
+    const input = document.getElementById('chat-input');
+    const text = input.value;
+    if(!text) return;
+    db.ref('members/'+currentUser.uid).once('value').then(snap => {
+        const name = snap.val() ? snap.val().name : "User";
+        db.ref('messages').push({ user: name, email: currentUser.email, text: text, time: Date.now() });
+        input.value = "";
+    });
 }
 
 function loadMembers() {
     const list = document.getElementById('members-list');
-    db.ref('members').on('value', (snap) => {
+    db.ref('members').orderByChild('booksRead').limitToLast(10).on('value', (snap) => {
         list.innerHTML = "";
-        snap.forEach(c => {
-            const m = c.val();
-            const d = new Date(m.joined).toLocaleDateString();
+        const members = [];
+        snap.forEach(c => members.push(c.val()));
+        members.sort((a,b) => (b.booksRead||0)-(a.booksRead||0));
+        members.forEach((m, idx) => {
+            const icon = idx === 0 ? '👑' : '👤';
             const item = document.createElement('ion-item');
-            item.innerHTML = `
-                <ion-avatar slot="start" style="background:#eee; display:flex; align-items:center; justify-content:center;"><span>👤</span></ion-avatar>
-                <ion-label><h2>${m.name}</h2><p>Joined: ${d}</p></ion-label>
-                <ion-badge color="medium" slot="end">${m.booksRead || 0} Books</ion-badge>
-            `;
+            item.innerHTML = `<div slot="start" style="font-size:24px;">${icon}</div><ion-label><h2>${m.name}</h2></ion-label><ion-badge slot="end">${m.booksRead || 0} Books</ion-badge>`;
             list.appendChild(item);
         });
     });
 }
 
-// Search & Helpers
+// Search & Secure Image Fix
 document.getElementById('club-search').addEventListener('ionChange', (e) => {
     const q = e.detail.value.toLowerCase();
     renderFeed(allPosts.filter(p => p.title.toLowerCase().includes(q)));
@@ -303,7 +312,8 @@ async function searchBook(mode) {
     const d = await res.json();
     if(d.items) {
         const b = d.items[0].volumeInfo;
-        const img = b.imageLinks ? b.imageLinks.thumbnail : '';
+        let img = b.imageLinks ? b.imageLinks.thumbnail : '';
+        if(img) img = img.replace(/^http:\/\//i, 'https://'); // HTTPS FIX
         if(mode==='private') {
             document.getElementById('inp-title').value = b.title;
             document.getElementById('inp-author').value = b.authors?b.authors[0]:'';
