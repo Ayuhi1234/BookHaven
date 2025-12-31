@@ -1,0 +1,12 @@
+# Node Modules (The heaviest folder, never upload this)
+node_modules/
+
+# OS Junk files
+.DS_Store
+Thumbs.db
+
+# Android Build files (These are generated automatically)
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
