@@ -22,13 +22,17 @@ jobs:
         with:
           node-version: 22
 
-      # 3. Install
-      - run: npm install
+      # 3. Force Clean Install (Fixes permission issues)
+      - name: Install Dependencies
+        run: |
+          rm -rf node_modules
+          npm install
 
       # 4. Sync
-      - run: npx cap sync
+      - name: Sync Capacitor
+        run: npx cap sync android
 
-      # 5. FIX PERMISSIONS & BUILD (The Magic Fix)
+      # 5. Build APK
       - name: Build APK
         run: |
           cd android
