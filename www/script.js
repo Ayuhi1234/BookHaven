@@ -1,171 +1,185 @@
-// --- APP STATE ---
-let books = [];
-let viewMode = 'list'; // 'list' or 'grid'
+// ==========================================
+// 1. FIREBASE CONFIGURATION
+// ==========================================
 
-// --- INIT ---
-window.onload = async () => {
-    await DatabaseService.init();
-    loadBooks();
-    setupSearch();
-    updateStats();
+// I put your SPECIFIC keys here. This is ready to run.
+const firebaseConfig = {
+  apiKey: "AIzaSyBpvzufWwZy73C1RP924Ja7_Yefkmhc4Lo",
+  authDomain: "bookhaven-club.firebaseapp.com",
+  
+  // ✅ CORRECT URL (Ends in .firebaseio.com)
+  databaseURL: "https://bookhaven-club-default-rtdb.firebaseio.com",
+  
+  projectId: "bookhaven-club",
+  storageBucket: "bookhaven-club.firebasestorage.app",
+  messagingSenderId: "1013891660638",
+  appId: "1:1013891660638:web:81a4adcd74f6e9c7822dcf",
+  measurementId: "G-DQ06ZQ13D4"
 };
 
-// --- NAVIGATION ---
+// Initialize the Cloud Connection
+try {
+  firebase.initializeApp(firebaseConfig);
+  var db = firebase.database(); // Connect to Realtime Database
+  console.log("Connected to Book Club ☁️");
+} catch (error) {
+  console.error("Firebase Error:", error);
+  alert("Database connection failed. Check console.");
+}
+
+
+// ==========================================
+// 2. APP STARTUP
+// ==========================================
+
+let books = JSON.parse(localStorage.getItem('bookhaven_db')) || [];
+
+window.onload = function() {
+    loadBooks();       // Load your private books
+    listenToClub();    // Load shared stories
+};
+
+
+// ==========================================
+// 3. NAVIGATION & UI
+// ==========================================
+
 function switchTab(tab) {
-    document.querySelectorAll('.page-section').forEach(el => el.classList.remove('active'));
-    document.getElementById('tab-' + tab).classList.add('active');
+    document.getElementById('tab-library').style.display = 'none';
+    document.getElementById('tab-club').style.display = 'none';
+    document.getElementById('tab-' + tab).style.display = 'block';
 }
 
-function toggleView() {
-    viewMode = viewMode === 'list' ? 'grid' : 'list';
-    document.getElementById('view-icon').name = viewMode === 'list' ? 'grid-outline' : 'list-outline';
-    document.getElementById('book-list-container').className = viewMode === 'list' ? 'list-view' : 'grid-view';
-    renderBooks(books);
-}
+function openModal() { document.getElementById('add-modal').present(); }
+function closeModal() { document.getElementById('add-modal').dismiss(); }
+function openPostModal() { document.getElementById('post-modal').present(); }
+function closePostModal() { document.getElementById('post-modal').dismiss(); }
 
-// --- MODAL HANDLING ---
-const modalElement = document.getElementById('add-modal');
-function openModal(id) { document.getElementById(id).present(); }
-function closeModal(id) { document.getElementById(id).dismiss(); }
 
-// --- CORE LOGIC ---
-async function saveBook() {
+// ==========================================
+// 4. PRIVATE LIBRARY LOGIC
+// ==========================================
+
+function saveBook() {
     const title = document.getElementById('inp-title').value;
     const author = document.getElementById('inp-author').value;
-    const status = document.getElementById('inp-status').value;
-    const rating = document.getElementById('inp-rating').value;
 
-    if (!title) { alert('Please enter a title'); return; }
+    if(title) {
+        books.push({
+            id: Date.now(),
+            title: title,
+            author: author,
+            done: false
+        });
+        localStorage.setItem('bookhaven_db', JSON.stringify(books));
+        closeModal();
+        loadBooks();
+        document.getElementById('inp-title').value = "";
+        document.getElementById('inp-author').value = "";
+    } else {
+        alert("Please enter a title!");
+    }
+}
 
-    const book = {
-        id: Date.now(),
-        title, author, status, rating,
-        dateAdded: new Date().toISOString()
-    };
+function loadBooks() {
+    const list = document.getElementById('book-list');
+    list.innerHTML = '';
+    let readCount = 0;
 
-    await DatabaseService.addBook(book);
-    closeModal('add-modal');
-    
-    // Clear inputs
-    document.getElementById('inp-title').value = '';
-    document.getElementById('inp-author').value = '';
-    
+    books.forEach(book => {
+        if(book.done) readCount++;
+        const item = document.createElement('ion-item');
+        item.innerHTML = `
+            <ion-checkbox slot="start" ${book.done ? 'checked' : ''} onclick="toggleDone(${book.id})"></ion-checkbox>
+            <ion-label>
+                <h2>${book.title}</h2>
+                <p>${book.author}</p>
+            </ion-label>
+            <ion-button fill="clear" color="danger" slot="end" onclick="deleteBook(${book.id})">
+                <ion-icon name="trash"></ion-icon>
+            </ion-button>
+        `;
+        list.appendChild(item);
+    });
+
+    document.getElementById('total-count').innerText = books.length;
+    document.getElementById('read-count').innerText = readCount;
+}
+
+function toggleDone(id) {
+    const book = books.find(b => b.id === id);
+    book.done = !book.done;
+    localStorage.setItem('bookhaven_db', JSON.stringify(books));
     loadBooks();
 }
 
-async function loadBooks() {
-    books = await DatabaseService.getAllBooks();
-    renderBooks(books);
-    updateStats();
-}
-
-async function deleteBook(id) {
+function deleteBook(id) {
     if(confirm("Delete this book?")) {
-        await DatabaseService.deleteBook(id);
+        books = books.filter(b => b.id !== id);
+        localStorage.setItem('bookhaven_db', JSON.stringify(books));
         loadBooks();
     }
 }
 
-function renderBooks(bookList) {
-    const container = document.getElementById('book-list-container');
-    container.innerHTML = '';
 
-    if (bookList.length === 0) {
-        container.innerHTML = '<div style="text-align:center; padding:40px; color:#999;">No books found.<br>Add one!</div>';
-        return;
-    }
+// ==========================================
+// 5. BOOK CLUB LOGIC (Shared Database)
+// ==========================================
 
-    bookList.forEach(b => {
-        const card = document.createElement('ion-card');
-        let color = b.status === 'Completed' ? 'success' : (b.status === 'Reading' ? 'warning' : 'medium');
-        
-        card.innerHTML = `
-            <ion-card-header>
-                <ion-card-subtitle style="color:var(--ion-color-${color})">${b.status}</ion-card-subtitle>
-                <ion-card-title>${b.title}</ion-card-title>
-                <ion-card-subtitle>by ${b.author}</ion-card-subtitle>
-            </ion-card-header>
-            <ion-card-content>
-                <div>Rating: ${'⭐'.repeat(b.rating)}</div>
-                <div style="text-align:right; margin-top:10px;">
-                    <ion-button fill="clear" color="danger" onclick="deleteBook(${b.id})">
-                        <ion-icon name="trash-outline"></ion-icon>
-                    </ion-button>
-                </div>
-            </ion-card-content>
-        `;
-        container.appendChild(card);
-    });
-}
+function sharePost() {
+    const user = document.getElementById('post-user').value;
+    const book = document.getElementById('post-book').value;
+    const content = document.getElementById('post-content').value;
 
-function setupSearch() {
-    const searchBar = document.getElementById('search-bar');
-    const segment = document.getElementById('filter-segment');
-
-    const filter = () => {
-        const query = searchBar.value.toLowerCase();
-        const status = segment.value;
-
-        const filtered = books.filter(b => {
-            const matchesSearch = b.title.toLowerCase().includes(query) || b.author.toLowerCase().includes(query);
-            const matchesStatus = status === 'all' || b.status === status;
-            return matchesSearch && matchesStatus;
+    if(user && content) {
+        // Send to Firebase
+        db.ref("reviews").push({
+            user: user,
+            book: book,
+            content: content,
+            time: Date.now()
+        }).then(() => {
+            alert("Posted to Club! 🎉");
+            closePostModal();
+            document.getElementById('post-content').value = "";
+        }).catch((error) => {
+            alert("Error posting: " + error.message);
         });
-        renderBooks(filtered);
-    };
-
-    searchBar.addEventListener('ionInput', filter);
-    segment.addEventListener('ionChange', filter);
-}
-
-function updateStats() {
-    const total = books.length;
-    const read = books.filter(b => b.status === 'Completed').length;
-    // Streak logic would check dates in a real scenario
-    const streak = read > 0 ? Math.floor(Math.random() * 10) + 1 : 0; 
-
-    document.getElementById('stat-total').innerText = total;
-    document.getElementById('stat-read').innerText = read;
-    document.getElementById('stat-streak').innerText = streak;
-}
-
-// --- DATABASE SERVICE (Abstraction) ---
-// This mocks SQLite structure using LocalStorage for stability
-// To use real SQLite, replace the methods below with plugin calls.
-class DatabaseService {
-    static async init() {
-        console.log("Database Initialized");
-        if (!localStorage.getItem('books_db')) {
-            localStorage.setItem('books_db', JSON.stringify([]));
-        }
-    }
-
-    static async getAllBooks() {
-        return JSON.parse(localStorage.getItem('books_db') || '[]');
-    }
-
-    static async addBook(book) {
-        const list = await this.getAllBooks();
-        list.push(book);
-        localStorage.setItem('books_db', JSON.stringify(list));
-    }
-
-    static async deleteBook(id) {
-        let list = await this.getAllBooks();
-        list = list.filter(b => b.id !== id);
-        localStorage.setItem('books_db', JSON.stringify(list));
-    }
-}
-
-// --- NOTIFICATIONS ---
-async function toggleReminder(ev) {
-    if (ev.detail.checked) {
-        // In a real app, request permissions here
-        alert("Reminder set for 8:00 PM daily!");
     } else {
-        alert("Reminder cancelled.");
+        alert("Please enter your Name and a Review!");
     }
 }
-function exportData() {
-    alert("This is a Premium feature! 💎");
+
+function listenToClub() {
+    const feed = document.getElementById('feed-list');
+    
+    // Listen for new posts
+    db.ref("reviews").limitToLast(20).on("value", (snapshot) => {
+        feed.innerHTML = "";
+        const reviews = [];
+        
+        snapshot.forEach((child) => {
+            reviews.push(child.val());
+        });
+        
+        // Show newest first
+        reviews.reverse().forEach((post) => {
+            const date = new Date(post.time).toLocaleDateString();
+            const card = document.createElement('ion-card');
+            card.innerHTML = `
+                <ion-card-header>
+                    <ion-card-subtitle>${post.user} • ${date}</ion-card-subtitle>
+                    <ion-card-title>📖 ${post.book}</ion-card-title>
+                </ion-card-header>
+                <ion-card-content style="color:#333;">
+                    "${post.content}"
+                </ion-card-content>
+            `;
+            feed.appendChild(card);
+        });
+
+        if(reviews.length === 0) {
+            feed.innerHTML = "<p style='text-align:center; margin-top:30px; opacity:0.6;'>No stories yet. Be the first! ✍️</p>";
+        }
+    });
 }
